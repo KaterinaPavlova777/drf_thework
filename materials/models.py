@@ -1,4 +1,5 @@
 from django.db import models
+from config.settings import AUTH_USER_MODEL
 
 
 # Create your models here.
@@ -8,6 +9,8 @@ class Course(models.Model):
                                 help_text='Загрузите превью')
     description = models.TextField(blank=True, null=True, verbose_name='Описание курса',
                                    help_text='Укажите описание курса')
+    owner = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="Владелец курса", blank=True,
+                              null=True)
 
     def __str__(self):
         return self.name
@@ -27,6 +30,8 @@ class Lesson(models.Model):
     video_link = models.URLField(blank=True, null=True, verbose_name='Ссылка на видео',
                                  help_text='Укажите ссылку на видео')
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='lessons', null=True)
+    owner = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="Владелец урока", blank=True,
+                              null=True)
 
     def __str__(self):
         return self.name
