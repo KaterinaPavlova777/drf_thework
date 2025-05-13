@@ -3,20 +3,18 @@ version: '3.9'
 services:
   app:
     build: .
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
+      POSTGRES_HOST: "localhost"  # Важно использовать имя сервиса
       POSTGRES_DB: coursework_drf
-      POSTGRES_HOST: db  # Используем имя сервиса
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 080201
       SECRET_KEY: django-insecure-*@i#y2gl3--=i$$z$$hb1%t-nm=jx@6tr7(55uniahl8#c!&b6vt
     ports:
       - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
-
   db:
     image: postgres:latest
     environment:
