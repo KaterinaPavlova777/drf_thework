@@ -1,11 +1,9 @@
-# Используем официальный образ Python
 FROM python:3.12-slim
 
 # Устанавливаем переменные окружения
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
-ENV PATH="/root/.local/bin:${PATH}"
 
 # Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y \
@@ -14,25 +12,26 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем Poetry
+# Устанавливаем Poetry глобально
 RUN pip install --upgrade pip && \
-    pip install poetry
+    pip install poetry && \
+    poetry config virtualenvs.create false
 
-# Настраиваем Poetry (не создавать виртуальные окружения в контейнере)
-RUN poetry config virtualenvs.create false
-
-# Создаем и переходим в рабочую директорию
+# Рабочая директория
 WORKDIR /code
 
-# Копируем файлы зависимостей
+# Копируем только файлы зависимостей
 COPY pyproject.toml poetry.lock ./
 
-# Устанавливаем зависимости через Poetry
-RUN poetry install --no-interaction --no-ansi --only main
+# Устанавливаем зависимости без текущего проекта
+RUN /root/.local/bin/poetry install --no-interaction --no-ansi --only main --no-root
 
 # Копируем весь проект
 COPY . .
 
-# Команда запуска
+# Указываем полный путь к poetry для гарантии
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Команда запуска (используем прямой вызов gunicorn)
 EXPOSE 8000
 CMD ["gunicorn", "Restapimodel.wsgi:application", "--bind", "0.0.0.0:8000"]
