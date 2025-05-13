@@ -159,7 +159,7 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
-CELERY_BROKER_URL = 'redis://localhost:6379'
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
 
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 
@@ -174,7 +174,7 @@ EMAIL_HOST = 'smtp.yandex.ru'
 EMAIL_PORT = 465
 EMAIL_USE_TLS = False
 EMAIL_USE_SSL = True
-EMAIL_HOST_USER = 'ssofstep7627@ya.ru'
+EMAIL_HOST_USER = 'miss.kat.katerina2007@gmail.com'
 EMAIL_HOST_PASSWORD = 'knzefuywnocvqljx'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 SERVER_EMAIL = EMAIL_HOST_USER
