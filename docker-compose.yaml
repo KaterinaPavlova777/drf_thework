@@ -1,67 +1,78 @@
+version: '3.9'
+
 services:
-  redis:
-    image: redis:latest
-    restart: on-failure
-    expose:
-      - "6379"
-    healthcheck:
-      test: redis-cli ping
-
-  db:
-    image: postgres:latest
-    restart: on-failure
-    env_file:
-      - .env
-    expose:
-      - "5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data/
-    healthcheck:
-      test: [ "CMD-SHELL","-c","pg_isready -U $POSTGRES_USER -d $POSTGRES_DB" ]
-      interval: 10s
-      retries: 5
-      timeout: 5s
-
   app:
     build: .
-    tty: true
-    image: drf_thework_app
-    ports:
-      - "8000:8000"
-    environment:
-      - POETRY_VIRTUALENVS_CREATE=false
-    command: poetry run sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     depends_on:
       db:
         condition: service_healthy
-    env_file:
-      - .env
+    environment:
+      POSTGRES_DB: coursework_drf
+      POSTGRES_HOST: db  # Используем имя сервиса
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 080201
+      SECRET_KEY: django-insecure-*@i#y2gl3--=i$$z$$hb1%t-nm=jx@6tr7(55uniahl8#c!&b6vt
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: coursework_drf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 080201
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d coursework_drf"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:latest
+    restart: unless-stopped
 
   celery:
     build: .
-    tty: true
     command: celery -A config worker -l INFO
-    restart: on-failure
     depends_on:
-      - redis
       - db
-      - app
-    env_file:
-      - .env
+      - redis
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: coursework_drf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 080201
+      SECRET_KEY: django-insecure-*@i#y2gl3--=i$$z$$hb1%t-nm=jx@6tr7(55uniahl8#c!&b6vt
+    restart: unless-stopped
 
   celery-beat:
     build: .
-    tty: true
     command: celery -A config beat -l info
-    restart: on-failure
+    depends_on:
+      - db
+      - redis
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: coursework_drf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 080201
+      SECRET_KEY: django-insecure-*@i#y2gl3--=i$$z$$hb1%t-nm=jx@6tr7(55uniahl8#c!&b6vt
+    restart: unless-stopped
     volumes:
       - .:/app
+
+  migrate:
+    build: .
+    command: python manage.py migrate
     depends_on:
-      - redis
-      - db
-      - app
-    env_file:
-      - .env
+      db:
+        condition: service_healthy
+    restart: on-failure
 
 volumes:
   pg_data:
