@@ -1,10 +1,28 @@
+# Используем официальный образ Python
 FROM python:3.12-slim
 
-WORKDIR /app
+# Устанавливаем переменные окружения
 
-RUN pip install poetry
-RUN poetry config virtualenvs.create false
-COPY pyproject.toml ./
-RUN poetry install --no-root
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
+# Устанавливаем зависимости системы
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Создаем и переходим в рабочую директорию
+WORKDIR /code
+
+# Копируем и устанавливаем зависимости Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем проект
 COPY . .
+
+# Команда запуска (может быть переопределена в docker-compose)
+EXPOSE 8000
+
+CMD ["gunicorn", "Restapimodel.wsgi:application", "--bind", "0.0.0.0:8000"]
