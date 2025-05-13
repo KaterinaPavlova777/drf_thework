@@ -1,113 +1,120 @@
 name: Django CI
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
+
+
   test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: 202054
+          POSTGRES_DB: homework
+          DJANGO_SECRET_KEY : sk_test_51R6C6QKGhL0esuUxZnb82UpUTGeKBATsukJi31EpehP43A8mGmAxkgCwiINTKIpseXQBNa4hp8HAP803J5mZXp0A001wrBsW9K
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      ENGINE: django.db.backends.postgresql_psycopg2
+      POSTGRES_DB : homework
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 202054
+      DJANGO_SECRET_KEY: sk_test_51R6C6QKGhL0esuUxZnb82UpUTGeKBATsukJi31EpehP43A8mGmAxkgCwiINTKIpseXQBNa4hp8HAP803J5mZXp0A001wrBsW9K
+
+
+
     steps:
-    - name: Check out code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Set environment variables
-      run: echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
+      - name: Run tests
+        run: python manage.py test
 
-    - name: Run migrations
-      env:
-        TEST_ENV: true
-      run: python manage.py migrate
+  build:
+    needs: test
+    runs-on: ubuntu-latest
 
-    - name: Run tests
-      env:
-        TEST_ENV: true
-      run: python manage.py test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        run: echo ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }} | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/lera:${{ github.sha }} .
+          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/lera:${{ github.sha }} ${{ secrets.DOCKER_HUB_USERNAME }}/lera:latest
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/lera:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/lera:latest
 
   deploy:
+    needs: build
     runs-on: ubuntu-latest
-    needs: test
+
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.6.0
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-#      - name: Clean server directory
-#        run: |
-#          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-#          rm -rf ${{ secrets.DEPLOY_DIR }}/*
-#          EOF
-
-      - name: Copy project files to server
+      - name: Verify server structure
         run: |
-          echo "Listing files in GitHub Actions runner before rsync:"
-          ls -la
-          rsync -avzr -e "ssh -o StrictHostKeyChecking=no" --exclude '__pycache__' --exclude '.git' --exclude '.gitignore' --exclude '.env.sample' ./ ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          echo "After rsync, listing contents of ${{ secrets.DEPLOY_DIR }}:"
-          ls -la ${{ secrets.DEPLOY_DIR }}
-          ls -la ${{ secrets.DEPLOY_DIR }}/config 2>/dev/null || echo "config directory not found"
-          EOF
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "ls -la ~/lera"
 
-      - name: Install dependencies on server
+      - name: Prepare deployment files
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          echo "Before cd, current directory:"
-          pwd
-          ls -la
-          cd ${{ secrets.DEPLOY_DIR }}
-          echo "After cd, current directory:"
-          pwd
-          ls -la
-          python3 -m venv venv || true
-          source venv/bin/activate
-          pip install --upgrade pip
-          echo "Before installing requirements, listing contents:"
-          ls -la
-          pip install -r requirements.txt
+          echo "${{ secrets.ENV_FILE }}" > .env
+          chmod 600 .env
+
+      - name: Sync necessary files
+        run: |
+          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" \
+            ./docker-compose.yml \
+            ./.env \
+            ./nginx \
+            ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:~/lera/
+
+      - name: Deploy application
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << EOF
+            cd ~/lera
+            echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | \
+              docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+            docker compose down --remove-orphans
+            docker compose pull
+            docker compose up -d --build
+
+            docker compose ps
           EOF
-
-#      - name: Apply migrations on server
-#        env:
-#          TEST_ENV: ''
-#        run: |
-#          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-#          echo "Before cd, current directory:"
-#          pwd
-#          ls -la
-#          cd ${{ secrets.DEPLOY_DIR }}
-#          echo "After cd, current directory:"
-#          pwd
-#          ls -la
-#          source venv/bin/activate
-#          export SECRET_KEY='${{ secrets.SECRET_KEY }}'
-#          export TEST_ENV=true
-#          echo "DEBUG: TEST_ENV=$TEST_ENV"
-#          python manage.py migrate
-#          EOF
-
-#      - name: Collect static files on server
-#        run: |
-#          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-#          cd ${{ secrets.DEPLOY_DIR }}
-#          source venv/bin/activate
-#          export SECRET_KEY='${{ secrets.SECRET_KEY }}'
-#          export POSTGRES_DB='drf-hw'
-#          export POSTGRES_USER='postgres'
-#          export POSTGRES_PASSWORD='simplepassword123'
-#          export DATABASE_HOST='localhost'
-#          export DATABASE_PORT='5432'
-#          export TEST_ENV=''
-#          echo "DEBUG: POSTGRES_DB=$POSTGRES_DB"
-#          echo "DEBUG: TEST_ENV=$TEST_ENV"
-#          python manage.py collectstatic --noinput
-#          EOF
