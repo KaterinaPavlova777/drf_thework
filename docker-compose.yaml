@@ -25,6 +25,7 @@ services:
   app:
     build: .
     tty: true
+    image: drf_thework_app
     ports:
       - "8000:8000"
     environment:
