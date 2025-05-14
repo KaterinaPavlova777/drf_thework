@@ -6,36 +6,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: 080201
-          POSTGRES_DB: coursework_drf
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
     env:
-      DATABASE_URL: postgresql://postgres:080201@localhost:5432/coursework_drf
+      SECRET_KEY: test_secret_key
+      POSTGRES_DB: test_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
       CELERY_BROKER_URL: redis://localhost:6379/0
-      DJANGO_SECRET_KEY: django-insecure-*@i#y2gl3--=i$z$hb1%t-nm=jx@6tr7(55uniahl8#c!&b6vt
-      DJANGO_SETTINGS_MODULE: Restapimodel.settings
 
     steps:
       - name: Checkout code
@@ -49,12 +27,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install poetry
-          poetry install --no-interaction --no-ansi
-          pip install django-celery-beat psycopg2-binary
-
-      - name: Run migrations
-        run: python manage.py migrate
+          pip install -r requirements.txt
 
       - name: Run tests
         run: python manage.py test
@@ -99,9 +72,13 @@ jobs:
 
       - name: Prepare deployment files
         run: |
-          echo "DATABASE_URL=postgresql://postgres:080201@db:5432/coursework_drf" > .env
+          echo "POSTGRES_DB=coursework_drf" > .env
+          echo "POSTGRES_USER=postgres" >> .env
+          echo "POSTGRES_PASSWORD=080201" >> .env
+          echo "POSTGRES_HOST=db" >> .env
+          echo "POSTGRES_PORT=5432" >> .env
           echo "CELERY_BROKER_URL=redis://redis:6379/0" >> .env
-          echo "DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}" >> .env
+          echo "SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}" >> .env
           chmod 600 .env
 
       - name: Sync necessary files
