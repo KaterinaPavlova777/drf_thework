@@ -7,15 +7,13 @@ stripe.api_key = STRIPE_API_KEY
 
 def create_stripe_product(instance):
     title = f"{instance.course}" if instance.course else instance.lesson
-    stripe_product = stripe.Product.create(name=f'{title}')
+    stripe_product = stripe.Product.create(name=f"{title}")
     return stripe_product.id
 
 
 def create_stripe_price(payment, stripe_product_id):
     price = stripe.Price.create(
-        currency="rub",
-        unit_amount=int(payment.amount * 100),
-        product=stripe_product_id
+        currency="rub", unit_amount=int(payment.amount * 100), product=stripe_product_id
     )
     return price.id
 

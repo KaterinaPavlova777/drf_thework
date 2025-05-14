@@ -7,8 +7,8 @@ from materials.validators import LinkValidator
 class LessonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lesson
-        fields = '__all__'
-        validators = [LinkValidator(field='link')]
+        fields = "__all__"
+        validators = [LinkValidator(field="link")]
 
 
 class CourseSerializer(serializers.ModelSerializer):
@@ -16,7 +16,7 @@ class CourseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = '__all__'
+        fields = "__all__"
 
 
 class CourseDetailSerializer(serializers.ModelSerializer):
@@ -25,12 +25,14 @@ class CourseDetailSerializer(serializers.ModelSerializer):
     subscription = serializers.SerializerMethodField()
 
     def get_subscription(self, course):
-        user = self.context['request'].user
-        return Subscription.objects.all().filter(user=user).filter(course=course).exists()
+        user = self.context["request"].user
+        return (
+            Subscription.objects.all().filter(user=user).filter(course=course).exists()
+        )
 
     class Meta:
         model = Course
-        fields = ('title', 'description', 'quantity_lessons', 'subscription')
+        fields = ("title", "description", "quantity_lessons", "subscription")
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):

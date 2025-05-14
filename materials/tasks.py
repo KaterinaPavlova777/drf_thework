@@ -14,7 +14,9 @@ def course_update_materials(course_pk):
     course = Course.objects.filter(pk=course_pk).first()
     users = User.objects.all()
     for user in users:
-        subscription = Subscription.objects.filter(course=course_pk, user=user.pk).first()
+        subscription = Subscription.objects.filter(
+            course=course_pk, user=user.pk
+        ).first()
         if subscription:
             send_mail(
                 subject=f'Новое обновление курса "{course.title}"',
@@ -31,6 +33,6 @@ def check_last_login():
         if timezone.now() - user.last_login > timedelta(days=30):
             user.is_active = False
             user.save()
-            print(f'Пользователь {user.email} - отключен')
+            print(f"Пользователь {user.email} - отключен")
         else:
-            print(f'Пользователь {user.email} - активен')
+            print(f"Пользователь {user.email} - активен")

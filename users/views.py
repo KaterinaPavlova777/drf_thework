@@ -3,7 +3,11 @@ from rest_framework.permissions import AllowAny
 
 from users.models import Payments, User
 from users.serializers import PaymentsSerializer, UserSerializer
-from users.services import create_stripe_product, create_stripe_price, create_stripe_session
+from users.services import (
+    create_stripe_product,
+    create_stripe_price,
+    create_stripe_session,
+)
 
 
 # Create your views here.
@@ -24,8 +28,8 @@ class PaymentsViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentsSerializer
     queryset = Payments.objects.all()
     filter_backends = [filters.OrderingFilter]
-    filterset_fields = ['course', 'lesson', 'payment_method']
-    ordering_fields = ['payment_date']
+    filterset_fields = ["course", "lesson", "payment_method"]
+    ordering_fields = ["payment_date"]
 
 
 class PaymentsCreateAPIView(generics.CreateAPIView):
