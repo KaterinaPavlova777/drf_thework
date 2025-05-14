@@ -20,6 +20,8 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        # Добавлено ожидание готовности
+        steps: [ { run: dockerize -wait tcp://localhost:5432 -timeout 1m } ]
 
       redis:
         image: redis:7
@@ -46,12 +48,23 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev python3-dev
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install poetry
-          poetry install --no-interaction --no-ansi
+          poetry config virtualenvs.create false
+          poetry install --no-interaction --no-ansi --no-root
           pip install django-celery-beat psycopg2-binary
+
+      - name: Wait for PostgreSQL
+        run: |
+          pip install dockerize
+          dockerize -wait tcp://localhost:5432 -timeout 1m
 
       - name: Run migrations
         run: python manage.py migrate
@@ -68,20 +81,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login to Docker Hub
+        if: github.ref == 'refs/heads/main'
         run: echo ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }} | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
 
       - name: Build Docker image
+        if: github.ref == 'refs/heads/main'
         run: |
           docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/drf_thework-app:${{ github.sha }} .
           docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/drf_thework-app:${{ github.sha }} ${{ secrets.DOCKER_HUB_USERNAME }}/drf_thework-app:latest
 
       - name: Push Docker image to Docker Hub
+        if: github.ref == 'refs/heads/main'
         run: |
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/drf_thework-app:${{ github.sha }}
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/drf_thework-app:latest
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
