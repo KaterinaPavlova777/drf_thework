@@ -3,7 +3,52 @@ name: Django CI/CD Pipeline
 on: [push, pull_request]
 
 jobs:
+  # Первая задача без зависимостей (может быть lint или test)
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run linting (example: flake8)
+        run: |
+          pip install flake8
+          flake8 .
+
+  # Тесты зависят от линтинга
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: python manage.py test
+        env:
+          SECRET_KEY: test_secret_key
+
+  # Сборка зависит от тестов
   build:
     needs: test
     runs-on: ubuntu-latest
@@ -25,6 +70,7 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/lera:${{ github.sha }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/lera:latest
 
+  # Деплой зависит от сборки
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -67,25 +113,3 @@ jobs:
 
             docker compose ps
           EOF
-
-  tests:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run tests
-        run: python manage.py test
-        env:
-          SECRET_KEY: test_secret_key
