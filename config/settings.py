@@ -61,6 +61,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+
 if "test" in sys.argv:
     DATABASES = {
         "default": {
