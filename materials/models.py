@@ -4,7 +4,7 @@ from config.settings import AUTH_USER_MODEL
 
 # Create your models here.
 class Course(models.Model):
-    name = models.CharField(
+    title = models.CharField(
         max_length=100,
         verbose_name="Название курса",
         help_text="Укажите название курса",
