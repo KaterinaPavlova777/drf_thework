@@ -1,0 +1,76 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    environment:
+      POSTGRES_HOST: "localhost"  # Важно использовать имя сервиса
+      POSTGRES_DB: coursework_drf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 080201
+      SECRET_KEY: django-insecure-*@i#y2gl3--=i$$z$$hb1%t-nm=jx@6tr7(55uniahl8#c!&b6vt
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: coursework_drf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 080201
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d coursework_drf"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:latest
+    restart: unless-stopped
+
+  celery:
+    build: .
+    command: celery -A config worker -l INFO
+    depends_on:
+      - db
+      - redis
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: coursework_drf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 080201
+      SECRET_KEY: django-insecure-*@i#y2gl3--=i$$z$$hb1%t-nm=jx@6tr7(55uniahl8#c!&b6vt
+    restart: unless-stopped
+
+  celery-beat:
+    build: .
+    command: celery -A config beat -l info
+    depends_on:
+      - db
+      - redis
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: coursework_drf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 080201
+      SECRET_KEY: django-insecure-*@i#y2gl3--=i$$z$$hb1%t-nm=jx@6tr7(55uniahl8#c!&b6vt
+    restart: unless-stopped
+    volumes:
+      - .:/app
+
+  migrate:
+    build: .
+    command: python manage.py migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  pg_data:
